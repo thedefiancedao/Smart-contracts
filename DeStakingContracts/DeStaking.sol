@@ -244,6 +244,17 @@ contract EasyStaking is Ownable, ReentrancyGuard {
         return true;
     }
 
+    function _updateUintParam(UintParam storage _param, uint256 _newValue) internal {
+        if (_param.timestamp == 0) {
+            _param.oldValue = _newValue;
+        } else if (_paramUpdateDelayElapsed(_param.timestamp)) {
+            _param.oldValue = _param.newValue;
+        }
+        _param.newValue = _newValue;
+        _param.timestamp = _now();
+    }
+
+
     /**
      * @dev This method is used to make a forced withdrawal with a fee.
      * It calls the internal "_withdraw" method.
@@ -261,12 +272,7 @@ contract EasyStaking is Ownable, ReentrancyGuard {
      * Note: each call updates the date of the request so don't call this method twice during the lock.
      *
      * @param _depositId User's unique deposit ID.
-     */
-    function requestWithdrawal(uint256 _depositId) external {
-        require(_depositId > 0 && _depositId <= lastDepositIds[msg.sender], "wrong deposit id");
-        withdrawalRequestsDates[msg.sender][_depositId] = _now();
-        emit WithdrawalRequested(msg.sender, _depositId);
-    }
+     *
 
     /**
      * @dev This method is used to make a requested withdrawal.
@@ -306,7 +312,6 @@ contract EasyStaking is Ownable, ReentrancyGuard {
         } else if (_token == address(token)) {
             uint256 availableAmount = token.balanceOf(address(this)).sub(totalStaked);
             require(availableAmount >= _amount, "insufficient funds");
-            require(token.transfer(_to, _amount), "transfer failed");
         } else {
             IERC20 customToken = IERC20(_token);
             customToken.safeTransfer(_to, _amount);
@@ -354,6 +359,12 @@ contract EasyStaking is Ownable, ReentrancyGuard {
         require(_value <= 1 ether, "should be less than or equal to 1 ether");
         _updateUintParam(totalSupplyFactorParam, _value);
         emit TotalSupplyFactorSet(_value, msg.sender);
+    }
+
+    function requestWithdrawal(uint256 _depositId) external {
+        require(_depositId > 0 && _depositId <= lastDepositIds[msg.sender], "wrong deposit id");
+        withdrawalRequestsDates[msg.sender][_depositId] = _now();
+        emit WithdrawalRequested(msg.sender, _depositId);
     }
 
     /**
@@ -498,10 +509,6 @@ contract EasyStaking is Ownable, ReentrancyGuard {
         (uint256 accruedEmission, uint256 timePassed) = _mint(_sender, _id, _amount);
         uint256 amount = _amount == 0 ? balances[_sender][_id] : _amount.add(accruedEmission);
         balances[_sender][_id] = balances[_sender][_id].sub(amount);
-        totalStaked = totalStaked.sub(amount);
-        if (balances[_sender][_id] == 0) {
-            depositDates[_sender][_id] = 0;
-        }
         uint256 feeValue = 0;
         if (_forced) {
             feeValue = amount.mul(fee()).div(1 ether);
@@ -534,16 +541,6 @@ contract EasyStaking is Ownable, ReentrancyGuard {
     /**
      * @dev Sets the next value of the parameter and the timestamp of this setting.
      */
-    function _updateUintParam(UintParam storage _param, uint256 _newValue) internal {
-        if (_param.timestamp == 0) {
-            _param.oldValue = _newValue;
-        } else if (_paramUpdateDelayElapsed(_param.timestamp)) {
-            _param.oldValue = _param.newValue;
-        }
-        _param.newValue = _newValue;
-        _param.timestamp = _now();
-    }
-
     /**
      * @return Returns the current value of the parameter.
      */
