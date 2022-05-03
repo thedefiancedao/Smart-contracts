@@ -162,7 +162,7 @@ contract DeFund is ReentrancyGuard{
     struct projectInfo {
         address tokenAddress;                   // Project Token Contract Address
         string tokenSymbol;                     // Project Token Symbol
-        address payable USDCWallet;             // Project or DAO wallet where USDC will be sent to
+        address payable DefiantWallet;             // Project or DAO wallet where USDC will be sent to
         uint256 tokenAmount;                    // Total amount to be raised
         uint256 totalRaised;                    // Total amount already raised
         uint16 exchangeRate;                    // ExchangeRate USDC to project token
@@ -178,6 +178,10 @@ contract DeFund is ReentrancyGuard{
 
     projectInfo[] public projects;              // Array of Project Information
     address public USDCAddress = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public CVXAddress = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+    address public BTRFLYAddress = 0xC0d4Ceb216B3BA9C3701B291766fDCbA977ceC3A;
+    address public FXSAddress = 0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0;
+    address public CRVAddress = 0xD533a949740bb3306d119CC777fa900bA034cd52;
 
     event Contribution(address from, uint256 amount);
     event ReleaseTokens(address from, uint256 amount);
@@ -203,7 +207,6 @@ contract DeFund is ReentrancyGuard{
         // uint256 _startDate
     ) {
 
-        // startDate = _startDate;   // One block in 3 seconds, 24h hours later ( current block + 28800  )
         totalRaise = 0;
         maxFundsRaised = _maxFundsRaised;   // 18 decimals
         creator = msg.sender;
@@ -237,7 +240,7 @@ contract DeFund is ReentrancyGuard{
     function register(
         string memory tokenSymbol,              // Project Token Symbol
         address tokenAddress,                   // Project Token Contract Address
-        address payable USDCWallet,             // Project or DAO wallet where USDC will be sent to
+        address payable DefiantWallet,             // Project or DAO wallet where USDC will be sent to
         uint256 tokenAmount,                    // Total amount to be raised
         uint16 exchangeRate,                    // ExchangeRate USDC to project token
         uint256 softCap,                        // Minimal raise amount to finish funding
@@ -258,7 +261,7 @@ contract DeFund is ReentrancyGuard{
             {
                 tokenSymbol: tokenSymbol,
                 tokenAddress: tokenAddress,
-                USDCWallet: USDCWallet,
+                DefiantWallet: DefiantWallet,
                 tokenAmount: tokenAmount,
                 totalRaised: 0,
                 exchangeRate: exchangeRate,
@@ -279,20 +282,62 @@ contract DeFund is ReentrancyGuard{
 
 
     // Lock USDC
-    function lockUSDC( uint256 amount, uint256 projectId ) external payable {
+    function deposit( uint256 amount, uint256 projectId, uint8 tokenType ) external payable {
 
         require(amount >= projects[projectId].minAllocation, "The quantity is too low");
         require(amount <= projects[projectId].maxAllocation, "The quantity is too high");
         require(( amount + projects[projectId].totalRaised ) * projects[projectId].exchangeRate >= projects[projectId].tokenAmount, "The total raise is higher than maximum raised funds" );
 
-        for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
-            if( projects[projectId].whitelist[i] == msg.sender ) {
-                projects[projectId].heldAmount[i] += amount;                
+        if(tokenType == 0) {
+            for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
+                if( projects[projectId].whitelist[i] == msg.sender ) {
+                    projects[projectId].heldAmount[i] += amount;                
+                }
             }
-        }
 
-        projects[projectId].totalRaised += amount;
-        IERC20(USDCAddress).transferFrom(msg.sender, address(holder), amount);
+            projects[projectId].totalRaised += amount;
+            IERC20(USDCAddress).transferFrom(msg.sender, address(holder), amount);
+        }
+        else if(tokenType == 1) {
+            for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
+                if( projects[projectId].whitelist[i] == msg.sender ) {
+                    projects[projectId].heldAmount[i] += amount;                
+                }
+            }
+
+            projects[projectId].totalRaised += amount * projects[projectId].exchangeRate + amount * projects[projectId].exchangeRate.mul(75).div(1000);
+            IERC20(CVXAddress).transferFrom(msg.sender, address(holder), amount);            
+        }        
+        else if(tokenType == 2) {
+            for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
+                if( projects[projectId].whitelist[i] == msg.sender ) {
+                    projects[projectId].heldAmount[i] += amount;                
+                }
+            }
+
+            projects[projectId].totalRaised += amount * projects[projectId].exchangeRate + amount * projects[projectId].exchangeRate.mul(75).div(1000);
+            IERC20(BTRFLYAddress).transferFrom(msg.sender, address(holder), amount);            
+        }        
+        else if(tokenType == 3) {
+            for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
+                if( projects[projectId].whitelist[i] == msg.sender ) {
+                    projects[projectId].heldAmount[i] += amount;                
+                }
+            }
+
+            projects[projectId].totalRaised += amount * projects[projectId].exchangeRate + amount * projects[projectId].exchangeRate.mul(75).div(1000);
+            IERC20(FXSAddress).transferFrom(msg.sender, address(holder), amount);            
+        }        
+        else if(tokenType == 4) {
+            for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
+                if( projects[projectId].whitelist[i] == msg.sender ) {
+                    projects[projectId].heldAmount[i] += amount;                
+                }
+            }
+
+            projects[projectId].totalRaised += amount * projects[projectId].exchangeRate + amount * projects[projectId].exchangeRate.mul(75).div(1000);
+            IERC20(CRVAddress).transferFrom(msg.sender, address(holder), amount);            
+        }        
     }
 
     //Unlock USDC
@@ -306,24 +351,7 @@ contract DeFund is ReentrancyGuard{
             IDOAddress: address(holder)
         });
 
-        IERC20(USDCAddress).transferFrom(address(holder), projects[projectId].USDCWallet, projects[projectId].totalRaised);
-    }
-
-    //Claim Pretoken
-    function claimPreToken( uint256 projectId ) external payable {
-
-        uint256 heldAmount = 0;
-        require(!projects[projectId].isFunding, "Haven't reached the claim goal");
-
-        for( uint i = 0; i < projects[projectId].whitelist.length; i ++) {
-            if( projects[projectId].whitelist[i] == msg.sender ) {
-                heldAmount = projects[projectId].heldAmount[i];
-                projects[projectId].heldAmount[i] = 0;
-            }
-        }
-
-        require(heldAmount != 0, "The amount held is 0");
-        IDeHolder(holder)._buy(projects[projectId].tokenAddress, msg.sender, heldAmount);
+        IERC20(USDCAddress).transferFrom(address(holder), projects[projectId].DefiantWallet, projects[projectId].totalRaised);
     }
 
     //Claim Project Token and burn pretoken
